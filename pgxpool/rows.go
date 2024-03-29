@@ -3,6 +3,7 @@ package pgxpool
 import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgproto3/v2"
+
 	"github.com/jackc/pgx/v4"
 )
 
@@ -15,6 +16,7 @@ func (e errRows) Err() error                                   { return e.err }
 func (errRows) CommandTag() pgconn.CommandTag                  { return nil }
 func (errRows) FieldDescriptions() []pgproto3.FieldDescription { return nil }
 func (errRows) Next() bool                                     { return false }
+func (errRows) NextE() bool                                    { return false }
 func (e errRows) Scan(dest ...interface{}) error               { return e.err }
 func (e errRows) Values() ([]interface{}, error)               { return nil, e.err }
 func (e errRows) RawValues() [][]byte                          { return nil }
@@ -64,6 +66,23 @@ func (rows *poolRows) Next() bool {
 		rows.Close()
 	}
 	return n
+}
+
+func (rows *poolRows) NextE() (bool, error) {
+	if rows.err != nil {
+		return false, nil
+	}
+
+	n, err := rows.r.NextE()
+	if err != nil {
+		rows.Close()
+		return false, err
+	}
+
+	if !n {
+		rows.Close()
+	}
+	return n, nil
 }
 
 func (rows *poolRows) Scan(dest ...interface{}) error {
