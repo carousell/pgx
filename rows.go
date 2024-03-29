@@ -39,6 +39,11 @@ type Rows interface {
 	// when all rows are read.
 	Next() bool
 
+	// NextE prepares the next row for reading. It returns true if there is another
+	// row and false if no more rows are available. It automatically closes rows
+	// when all rows are read. And it returns an error if there is an error.
+	NextE() (bool, error)
+
 	// Scan reads the values from the current row into dest values positionally.
 	// dest can include pointers to core types, values implementing the Scanner
 	// interface, and nil. nil will skip the value entirely. It is an error to
@@ -191,6 +196,27 @@ func (rows *connRows) Next() bool {
 	} else {
 		rows.Close()
 		return false
+	}
+}
+
+func (rows *connRows) NextE() (bool, error) {
+	if rows.closed {
+		return false, nil
+	}
+
+	next, err := rows.resultReader.NextRowE()
+	if err != nil {
+		rows.Close()
+		return false, err
+	}
+
+	if next {
+		rows.rowCount++
+		rows.values = rows.resultReader.Values()
+		return true, nil
+	} else {
+		rows.Close()
+		return false, nil
 	}
 }
 
